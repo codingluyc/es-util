@@ -32,7 +32,7 @@ public class EsConfig {
         credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials("elastic", "123456"));
         // Create the low-level client
         RestClient httpClient = RestClient.builder(
-                new HttpHost("localhost", 9201)
+                new HttpHost("127.0.0.1", 9200)
         ).setFailureListener(new FailureListener())
                 .setHttpClientConfigCallback(httpClientBuilder -> {
                     httpClientBuilder.disableAuthCaching();
@@ -44,12 +44,18 @@ public class EsConfig {
                     httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
                     return  httpClientBuilder;
                 })
+                .setRequestConfigCallback(requestConfigBuilder -> {
+                    requestConfigBuilder.setAuthenticationEnabled(true);
+                    requestConfigBuilder.setConnectTimeout(30000);
+                    requestConfigBuilder.setConnectionRequestTimeout(10000);
+                    requestConfigBuilder.setSocketTimeout(15000);
+                    return requestConfigBuilder;
+                })
                 .build();
 
         // Create the Java API Client with the same low level client
         ElasticsearchTransport transport = new RestClientTransport(
-                httpClient,
-                new JacksonJsonpMapper()
+                httpClient, new JacksonJsonpMapper()
         );
 
         ElasticsearchClient esClient = new ElasticsearchClient(transport);

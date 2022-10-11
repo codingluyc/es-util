@@ -17,6 +17,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     implementation 'co.elastic.clients:elasticsearch-java:7.17.6'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.3'
+    implementation 'jakarta.json:jakarta.json-api:2.0.1'
 }
 
 tasks.named('test') {
