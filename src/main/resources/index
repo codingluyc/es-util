@@ -1,0 +1,28 @@
+PUT /person_t
+{
+  "mappings": {
+    "properties": {
+      "name":{
+        "type": "keyword"
+      },
+      "num":{
+        "type": "keyword"
+      },
+      "motto":{
+        "type": "text",
+        "fields": {
+          "keyword":{
+            "type":"keyword"
+          }
+        }
+      },
+      "birthday":{
+        "type": "date",
+        "format": "yyyy-MM-dd"
+      },
+      "height":{
+        "type": "double"
+      }
+    }
+  }
+}

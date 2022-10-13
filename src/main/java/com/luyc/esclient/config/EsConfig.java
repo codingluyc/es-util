@@ -4,6 +4,9 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import co.elastic.clients.transport.ElasticsearchTransport;
 import co.elastic.clients.transport.rest_client.RestClientTransport;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
@@ -14,6 +17,7 @@ import org.elasticsearch.client.RestClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
 import java.time.Duration;
@@ -23,16 +27,22 @@ import java.time.Duration;
  * @since 2022/10/11 16:40
  */
 @SpringBootConfiguration
+@ConfigurationProperties("elasticsearch")
 public class EsConfig {
+
+    private String host = "127.0.0.1";
+    private Integer port = 9201;
+    private String userName;
+    private String password;
 
 
     @Bean
     public ElasticsearchClient esClient(){
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-        credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials("elastic", "123456"));
+        credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(userName, password));
         // Create the low-level client
         RestClient httpClient = RestClient.builder(
-                new HttpHost("127.0.0.1", 9200)
+                new HttpHost(host, port)
         ).setFailureListener(new FailureListener())
                 .setHttpClientConfigCallback(httpClientBuilder -> {
                     httpClientBuilder.disableAuthCaching();
@@ -55,7 +65,8 @@ public class EsConfig {
 
         // Create the Java API Client with the same low level client
         ElasticsearchTransport transport = new RestClientTransport(
-                httpClient, new JacksonJsonpMapper()
+                httpClient,
+                new JacksonJsonpMapper(new ObjectMapper().registerModule(new JavaTimeModule()))//使用JackSon json解析器，并使用javaTime模块用于适配LocalDateTIme
         );
 
         ElasticsearchClient esClient = new ElasticsearchClient(transport);
@@ -69,5 +80,38 @@ public class EsConfig {
         public void onFailure(Node node) {
             log.error("node:{} has failure",node.toString());
         }
+    }
+
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
+
+    public Integer getPort() {
+        return port;
+    }
+
+    public void setPort(Integer port) {
+        this.port = port;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

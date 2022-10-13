@@ -14,10 +14,17 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
+    annotationProcessor "org.springframework.boot:spring-boot-configuration-processor"
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+//    elastic
     implementation 'co.elastic.clients:elasticsearch-java:7.17.6'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.3'
     implementation 'jakarta.json:jakarta.json-api:2.0.1'
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: '2.13.3'
+
+//    swagger
+    implementation group: 'com.github.xiaoymin', name: 'knife4j-spring-boot-starter', version: '2.0.9'
+
 }
 
 tasks.named('test') {
