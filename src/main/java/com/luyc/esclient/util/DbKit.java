@@ -1,9 +1,9 @@
 package com.luyc.esclient.util;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.mapping.Property;
 import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
-import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.cat.IndicesRequest;
 import co.elastic.clients.elasticsearch.cat.indices.IndicesRecord;
@@ -14,7 +14,7 @@ import co.elastic.clients.elasticsearch.indices.GetIndexRequest;
 import co.elastic.clients.elasticsearch.indices.GetIndexResponse;
 import co.elastic.clients.elasticsearch.indices.IndexState;
 import com.luyc.esclient.common.BaseEntity;
-import com.luyc.esclient.common.FieldQuery;
+import com.luyc.esclient.common.OrderQuery;
 import com.luyc.esclient.vo.Field;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * es工具类
@@ -68,6 +69,47 @@ public class DbKit {
 
     //默认最大数据量
     public static int MAX_SIZE = 10000;
+
+    /**
+     * @Author luyc
+     * @Description 创建排序
+     * @Date 2022/10/14 10:14
+     * @Param [sorts]
+     * @return java.util.List<co.elastic.clients.elasticsearch._types.SortOptions>
+     **/
+    private List<SortOptions> sort(List<OrderQuery> sorts){
+        if(!CollectionUtils.isEmpty(sorts)) {
+            return sorts.stream().map(s -> s.toSort()).collect(Collectors.toList());
+        }else{
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * @Author luyc
+     * @Description 创建文档查询请求
+     * @Date 2022/10/14 10:18
+     * @Param [index, query, sorts, size, queryAll]
+     * @return co.elastic.clients.elasticsearch.core.SearchRequest
+     **/
+    private SearchRequest search(String index, Query query, List<OrderQuery> sorts,Integer size,boolean queryAll){
+        SearchRequest searchRequest = SearchRequest.of(builder -> {
+            builder.index(index);
+            builder.query(query);
+            if(queryAll) {
+                //track_total_hits": true
+                builder.trackTotalHits(t -> t.enabled(true));
+            }
+            if(CollectionUtils.isEmpty(sorts)) {
+                builder.sort(sort(sorts));
+            }
+            if(size != null && size.intValue() >= 0){
+                builder.size(size);
+            }
+            return builder;
+        });
+        return searchRequest;
+    }
 
     /**
      * @return java.util.List<co.elastic.clients.elasticsearch.cat.indices.IndicesRecord>
@@ -122,12 +164,7 @@ public class DbKit {
      * @return T
      **/
     public <T> T selSingleDocument(String index,Query query,Class<T> documentType) throws IOException {
-        SearchRequest searchRequest = SearchRequest.of(builder -> {
-            builder.index(index);
-            builder.query(query);
-            builder.size(1);
-            return builder;
-        });
+        SearchRequest searchRequest = search(index,query,null,1,false);
         SearchResponse<T> response =  client.search(searchRequest,documentType);
         List<Hit<T>> list = response.hits().hits();
         if(CollectionUtils.isEmpty(list)){
@@ -139,6 +176,32 @@ public class DbKit {
             baseEntity.setId(list.get(0).id());
         }
         return result;
+    }
+
+    
+    /**
+     * @Author luyc
+     * @Description 查询列表
+     * @Date 2022/10/14 10:21
+     * @Param [index, query, sorts, documentType]
+     * @return java.util.List<T>
+     **/
+    public <T> List<T> selList(String index, Query query, List<OrderQuery> sorts,Class<T> documentType) throws IOException {
+        SearchRequest searchRequest = search(index,query,sorts,null,true);
+        SearchResponse<T> response =  client.search(searchRequest,documentType);
+        List<Hit<T>> hits = response.hits().hits();
+        List<T> list = new ArrayList<>(hits.size());
+        Iterator<Hit<T>> iterator = hits.iterator();
+        while(iterator.hasNext()){
+            Hit<T> hit = iterator.next();
+            T t = hit.source();
+            if(BaseEntity.class.isAssignableFrom(documentType)){
+                BaseEntity baseEntity = (BaseEntity)t;
+                baseEntity.setId(hit.id());
+            }
+            list.add(t);
+        }
+        return list;
     }
 
 

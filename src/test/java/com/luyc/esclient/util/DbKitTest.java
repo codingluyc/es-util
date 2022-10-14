@@ -41,5 +41,6 @@ public class DbKitTest extends EsClientApplicationTests {
 
         Query query = Query.of(q->q.bool(boolQuery));
         Person person = dbKit.selSingleDocument("person_t",query ,Person.class);
+
     }
 }
