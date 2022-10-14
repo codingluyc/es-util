@@ -51,7 +51,11 @@ public class QueryBuilder {
      **/
     public static BoolQuery buildQuery(List<FieldQuery> list) {
         BoolQuery boolQuery = BoolQuery.of(bool -> {
-
+            Iterator<FieldQuery> iterator = list.iterator();
+            while(iterator.hasNext()){
+                FieldQuery fieldQuery = iterator.next();
+                query(bool,fieldQuery);
+            }
             return bool;
         });
         return boolQuery;
@@ -132,6 +136,11 @@ public class QueryBuilder {
                             w.field(fieldQuery.getField()).value(sb.toString())
                     )
             );
+        } else if (fieldQuery.getType().equals(BoolType.MATCH)) {
+            builder.filter(f->f.match(m->m.field(fieldQuery.getField()).query((String)fieldQuery.getValue())));
+        } else if (fieldQuery.getType().equals(BoolType.MATCH_PHRASE)) {
+            builder.filter(f->
+                    f.matchPhrase(m->m.field(fieldQuery.getField()).query((String) fieldQuery.getValue())));
         }
     }
 }
