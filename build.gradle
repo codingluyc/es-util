@@ -1,5 +1,19 @@
+buildscript {
+    repositories {
+        maven {
+            allowInsecureProtocol = true
+            url 'http://maven.aliyun.com/nexus/content/repositories/google' }
+        maven {
+            allowInsecureProtocol = true
+            url 'http://maven.aliyun.com/nexus/content/repositories/jcenter'}
+        maven {
+            allowInsecureProtocol = true
+            url 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    }
+
+}
 plugins {
-    id 'org.springframework.boot' version '2.7.4'
+    id 'org.springframework.boot' version '2.7.3'
     id 'io.spring.dependency-management' version '1.0.14.RELEASE'
     id 'java'
 }
@@ -9,7 +23,12 @@ version = '0.0.1-SNAPSHOT'
 sourceCompatibility = '1.8'
 
 repositories {
-    mavenCentral()
+    maven {
+        allowInsecureProtocol = true
+        url 'http://maven.aliyun.com/nexus/content/repositories/jcenter'}
+    maven {
+        allowInsecureProtocol = true
+        url 'http://maven.aliyun.com/nexus/content/groups/public/' }
 }
 
 dependencies {
