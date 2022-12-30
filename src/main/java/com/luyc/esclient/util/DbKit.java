@@ -5,15 +5,18 @@ import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.aggregations.*;
 import co.elastic.clients.elasticsearch._types.mapping.Property;
 import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
+import co.elastic.clients.elasticsearch._types.query_dsl.FieldAndFormat;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.cat.IndicesRequest;
 import co.elastic.clients.elasticsearch.cat.indices.IndicesRecord;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.core.search.SourceConfig;
 import co.elastic.clients.elasticsearch.indices.GetIndexRequest;
 import co.elastic.clients.elasticsearch.indices.GetIndexResponse;
 import co.elastic.clients.elasticsearch.indices.IndexState;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.luyc.esclient.common.*;
 import com.luyc.esclient.vo.Field;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,15 +86,48 @@ public class DbKit {
     }
 
     /**
+     * @author luyc
+     * @Description 通过类查询有哪些字段需要查询
+     * @Date 2022/12/30 16:12
+     * @param clazz
+     * @return java.util.List<co.elastic.clients.elasticsearch._types.query_dsl.FieldAndFormat>
+     **/
+    private List<String> getFields(Class clazz){
+        List<String> list = new ArrayList<>();
+        List<java.lang.reflect.Field> fieldList = new ArrayList<>();
+        /**
+         * 将父类的属性加入
+         */
+        Collections.addAll(fieldList,clazz.getDeclaredFields());
+        Class superClass = clazz.getSuperclass();
+        while(superClass != null){
+            java.lang.reflect.Field[] superFields =  superClass.getDeclaredFields();
+            Collections.addAll(fieldList,superFields);
+            superClass = superClass.getSuperclass();
+        }
+
+        for(java.lang.reflect.Field field:fieldList){
+            JsonProperty jsonProperty = field.getAnnotation(JsonProperty.class);
+            if(jsonProperty != null){
+                list.add(jsonProperty.value());
+            }
+        }
+        return list;
+    }
+
+    /**
      * @Author luyc
      * @Description 创建文档查询请求
      * @Date 2022/10/14 10:18
      * @Param [index, query, sorts, size, queryAll]
      * @return co.elastic.clients.elasticsearch.core.SearchRequest
      **/
-    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, Integer size, boolean queryAll){
+    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, Integer size, boolean queryAll,Class clazz){
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
+            if(clazz != null && !clazz.equals(Void.class)){
+                builder.source(SourceConfig.of(s->s.filter(source->source.includes(getFields(clazz)))));
+            }
             builder.query(query);
             if(queryAll) {
                 //track_total_hits": true
@@ -115,20 +151,16 @@ public class DbKit {
      * @Param [index, query, sorts, size, queryAll]
      * @return co.elastic.clients.elasticsearch.core.SearchRequest
      **/
-    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, Integer size, boolean queryAll, List<AggQuery> aggregations){
+    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, List<AggQuery> aggregations){
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
             builder.query(query);
-            if(queryAll) {
-                //track_total_hits": true
-                builder.trackTotalHits(t -> t.enabled(true));
-            }
+
+
             if(!CollectionUtils.isEmpty(sorts)) {
                 builder.sort(sort(sorts));
             }
-            if(size != null && size.intValue() >= 0){
-                builder.size(size);
-            }
+
             if(!CollectionUtils.isEmpty(aggregations)) {
                 Map<String,Aggregation> aggregationMap = new HashMap<>();
                 for(AggQuery aggregation:aggregations){
@@ -148,20 +180,12 @@ public class DbKit {
      * @Param [index, query, sorts, size, queryAll]
      * @return co.elastic.clients.elasticsearch.core.SearchRequest
      **/
-    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, Integer size, boolean queryAll, AggQuery... aggregations){
+    private SearchRequest search(String index, Query query,  AggQuery... aggregations){
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
             builder.query(query);
-            if(queryAll) {
-                //track_total_hits": true
-                builder.trackTotalHits(t -> t.enabled(true));
-            }
-            if(!CollectionUtils.isEmpty(sorts)) {
-                builder.sort(sort(sorts));
-            }
-            if(size != null && size.intValue() >= 0){
-                builder.size(size);
-            }
+            builder.trackTotalHits(t -> t.enabled(true));
+            builder.size(0);
             if(aggregations != null && aggregations.length >0) {
                 Map<String,Aggregation> aggregationMap = new HashMap<>();
                 for(AggQuery aggregation:aggregations){
@@ -181,20 +205,12 @@ public class DbKit {
      * @Param [index, query, sorts, size, queryAll]
      * @return co.elastic.clients.elasticsearch.core.SearchRequest
      **/
-    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, Integer size, boolean queryAll, AggQuery aggregation){
+    private SearchRequest search(String index, Query query, List<OrderQuery> sorts,  AggQuery aggregation){
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
             builder.query(query);
-            if(queryAll) {
-                //track_total_hits": true
-                builder.trackTotalHits(t -> t.enabled(true));
-            }
-            if(!CollectionUtils.isEmpty(sorts)) {
-                builder.sort(sort(sorts));
-            }
-            if(size != null && size.intValue() >= 0){
-                builder.size(size);
-            }
+            builder.trackTotalHits(t -> t.enabled(true));
+            builder.size(0);
             if(aggregation != null){
                 builder.aggregations(aggregation.getAggName(),aggregation.getAggregation());
             }
@@ -256,7 +272,7 @@ public class DbKit {
      * @return T
      **/
     public <T> T selSingleDocument(String index,Query query,Class<T> documentType) throws IOException {
-        SearchRequest searchRequest = search(index,query,null,1,false);
+        SearchRequest searchRequest = search(index,query,null,1,false,documentType);
         SearchResponse<T> response =  client.search(searchRequest,documentType);
         List<Hit<T>> list = response.hits().hits();
         if(CollectionUtils.isEmpty(list)){
@@ -279,7 +295,7 @@ public class DbKit {
      * @return java.util.List<T>
      **/
     public <T> List<T> selList(String index, Query query, List<OrderQuery> sorts,Class<T> documentType) throws IOException {
-        SearchRequest searchRequest = search(index,query,sorts,null,true);
+        SearchRequest searchRequest = search(index,query,sorts,null,true,documentType);
         SearchResponse<T> response =  client.search(searchRequest,documentType);
         List<Hit<T>> hits = response.hits().hits();
         List<T> list = new ArrayList<>(hits.size());
@@ -306,7 +322,7 @@ public class DbKit {
      * @return physical.common.pojo.AggResult
      **/
     public AggResult selByAgg(String index,  Query query, AggQuery aggQuery) throws IOException {
-        SearchRequest searchRequest = search(index,query,null,0,true,aggQuery);
+        SearchRequest searchRequest = search(index,query,aggQuery);
 
         SearchResponse searchResponse =  client.search(searchRequest,Void.class);
         Map<String, Aggregate> agg = searchResponse.aggregations();
@@ -325,7 +341,7 @@ public class DbKit {
      * @return java.util.List<physical.common.pojo.AggResult>
      **/
     public List<AggResult> selByAggs(String index,Query query, AggQuery... aggs) throws IOException {
-        SearchRequest searchRequest = search(index,query,null,0,true,aggs);
+        SearchRequest searchRequest = search(index,query,aggs);
         SearchResponse searchResponse =  client.search(searchRequest, Void.class);
         Map<String, Aggregate> aggsMap = searchResponse.aggregations();
         List<AggResult> list = new ArrayList<>();

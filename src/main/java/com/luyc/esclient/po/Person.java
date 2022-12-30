@@ -17,8 +17,8 @@ public class Person extends BaseEntity {
     @JsonProperty(value = "name")
     private String name;
 
-//    @JsonProperty(value = "num")
-//    private String num;
+    @JsonProperty(value = "num")
+    private String num;
 
     @JsonProperty(value = "moto")
     private String moto;
@@ -38,13 +38,13 @@ public class Person extends BaseEntity {
         this.name = name;
     }
 
-//    public String getNum() {
-//        return num;
-//    }
-//
-//    public void setNum(String num) {
-//        this.num = num;
-//    }
+    public String getNum() {
+        return num;
+    }
+
+    public void setNum(String num) {
+        this.num = num;
+    }
 
     public String getMoto() {
         return moto;
