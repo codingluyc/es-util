@@ -308,7 +308,7 @@ public class DbKit {
     public AggResult selByAgg(String index,  Query query, AggQuery aggQuery) throws IOException {
         SearchRequest searchRequest = search(index,query,null,0,true,aggQuery);
 
-        SearchResponse searchResponse =  client.search(searchRequest,null);
+        SearchResponse searchResponse =  client.search(searchRequest,Void.class);
         Map<String, Aggregate> agg = searchResponse.aggregations();
         AggResult aggResult = new AggResult(aggQuery.getAggName());
         agg(agg.get(aggQuery.getAggName()),aggResult);
@@ -326,7 +326,7 @@ public class DbKit {
      **/
     public List<AggResult> selByAggs(String index,Query query, AggQuery... aggs) throws IOException {
         SearchRequest searchRequest = search(index,query,null,0,true,aggs);
-        SearchResponse searchResponse =  client.search(searchRequest, null);
+        SearchResponse searchResponse =  client.search(searchRequest, Void.class);
         Map<String, Aggregate> aggsMap = searchResponse.aggregations();
         List<AggResult> list = new ArrayList<>();
         for(AggQuery tempAgg:aggs) {
@@ -347,9 +347,35 @@ public class DbKit {
      * @return physical.common.Record
      **/
     private AggResult agg(Aggregate agg,AggResult result){
-        if(agg.isMultiTerms() ){
+        if(agg.isSterms() ){
             result.initBucket();
-            for(MultiTermsBucket bucket:agg.multiTerms().buckets().array()){
+            for(StringTermsBucket bucket:agg.sterms().buckets().array()){
+                Bucket b = new Bucket(bucket.key(),bucket.docCount());
+                result.addBucket(b);
+                b.initSubAggs();
+                Map<String, Aggregate> aggregations = bucket.aggregations();
+                for(Map.Entry<String, Aggregate> tmp:aggregations.entrySet()){
+                    AggResult r = new AggResult(tmp.getKey());
+                    agg(tmp.getValue(),r);
+                    b.addSubAgg(r);
+                }
+            }
+        } else if (agg.isLterms()) {
+            result.initBucket();
+            for(LongTermsBucket bucket:agg.lterms().buckets().array()){
+                Bucket b = new Bucket(bucket.key(),bucket.docCount());
+                result.addBucket(b);
+                b.initSubAggs();
+                Map<String, Aggregate> aggregations = bucket.aggregations();
+                for(Map.Entry<String, Aggregate> tmp:aggregations.entrySet()){
+                    AggResult r = new AggResult(tmp.getKey());
+                    agg(tmp.getValue(),r);
+                    b.addSubAgg(r);
+                }
+            }
+        } else if (agg.isDterms()) {
+            result.initBucket();
+            for(DoubleTermsBucket bucket:agg.dterms().buckets().array()){
                 Bucket b = new Bucket(bucket.keyAsString(),bucket.docCount());
                 result.addBucket(b);
                 b.initSubAggs();
@@ -360,7 +386,7 @@ public class DbKit {
                     b.addSubAgg(r);
                 }
             }
-        }else if (agg.isDateHistogram()) {
+        } else if (agg.isDateHistogram()) {
             DateHistogramAggregate dateHistogramAggregate = agg.dateHistogram();
             result.initBucket();
             for(DateHistogramBucket dateBucket:dateHistogramAggregate.buckets().array()){
@@ -374,15 +400,19 @@ public class DbKit {
                     b.addSubAgg(r);
                 }
             }
-        }else{
+        } else{
             if(agg.isSum()) {
-                result.setValue(agg.sum().valueAsString());
+                result.setValue(String.valueOf(agg.sum().value()));
+                result.setDoubleValue(agg.sum().value());
             }else if(agg.isValueCount()) {
                 result.setValue(agg.valueCount().valueAsString());
+                result.setDoubleValue(agg.valueCount().value());
             } else if(agg.isCardinality()){
                 result.setValue(String.valueOf(agg.cardinality().value()));
+                result.setLongValue(agg.cardinality().value());
             } else if(agg.isAvg()){
                 result.setValue(agg.avg().valueAsString());
+                result.setDoubleValue(agg.avg().value());
             }
         }
         return result;

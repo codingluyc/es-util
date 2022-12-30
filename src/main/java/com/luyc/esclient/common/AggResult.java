@@ -15,6 +15,10 @@ public class AggResult {
 
     private String value;
 
+    private Long longValue;
+
+    private Double doubleValue;
+
     private List<Bucket> buckets;
     private List<AggResult> subAggs;
 
@@ -38,14 +42,27 @@ public class AggResult {
         this.aggName = aggName;
     }
 
+    public void setDoubleValue(Double doubleValue) {
+        this.doubleValue = doubleValue;
+    }
+
+    public Long getLongValue() {
+        return longValue;
+    }
+
+    public void setLongValue(Long longValue) {
+        this.longValue = longValue;
+    }
+
     public String getValue() {
         return value;
     }
 
     public Double getDoubleValue(){
-
-        return new Double(new BigDecimal(Double.valueOf(this.value)).setScale(4,BigDecimal.ROUND_HALF_UP).doubleValue());
+        return new Double(new BigDecimal(Double.valueOf(this.doubleValue)).setScale(4,BigDecimal.ROUND_HALF_UP).doubleValue());
     }
+
+
 
     public Integer getIntegerValue(){
         return new Integer(new Double(this.value).intValue());

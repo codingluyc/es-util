@@ -2,13 +2,12 @@ package com.luyc.esclient.common;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
-import physical.common.Page;
 
 import java.util.List;
 
 /**
  * <description>
- * 分页结果 {@link Page}类的泛型化
+ * 分页结果
  * @author luyc
  * @since 2022/8/26 14:34
  */

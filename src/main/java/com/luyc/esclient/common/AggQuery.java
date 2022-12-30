@@ -10,6 +10,14 @@ public class AggQuery {
     private Aggregation aggregation;
     private String aggName;
 
+    public AggQuery() {
+    }
+
+    public AggQuery(String aggName, Aggregation aggregation) {
+        this.aggregation = aggregation;
+        this.aggName = aggName;
+    }
+
     public Aggregation getAggregation() {
         return aggregation;
     }
