@@ -1,6 +1,8 @@
 package com.luyc.esclient.util;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.Refresh;
+import co.elastic.clients.elasticsearch._types.Result;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.aggregations.*;
 import co.elastic.clients.elasticsearch._types.mapping.Property;
@@ -9,8 +11,9 @@ import co.elastic.clients.elasticsearch._types.query_dsl.FieldAndFormat;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.cat.IndicesRequest;
 import co.elastic.clients.elasticsearch.cat.indices.IndicesRecord;
-import co.elastic.clients.elasticsearch.core.SearchRequest;
-import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.*;
+import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
+import co.elastic.clients.elasticsearch.core.bulk.BulkResponseItem;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.SourceConfig;
 import co.elastic.clients.elasticsearch.indices.GetIndexRequest;
@@ -25,6 +28,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -42,8 +46,6 @@ public class DbKit {
     public void setClient(ElasticsearchClient client) {
         this.client = client;
     }
-
-
 
 
 //    public static final int MATCH = 1;//分词匹配
@@ -65,78 +67,77 @@ public class DbKit {
 //    public static final int WILDCARD = 12;//模糊匹配
 
 
-
-
     //默认最大数据量
     public static int MAX_SIZE = 10000;
 
     /**
+     * @return java.util.List<co.elastic.clients.elasticsearch._types.SortOptions>
      * @Author luyc
      * @Description 创建排序
      * @Date 2022/10/14 10:14
      * @Param [sorts]
-     * @return java.util.List<co.elastic.clients.elasticsearch._types.SortOptions>
      **/
-    private List<SortOptions> sort(List<OrderQuery> sorts){
-        if(!CollectionUtils.isEmpty(sorts)) {
+    private List<SortOptions> sort(List<OrderQuery> sorts) {
+        if (!CollectionUtils.isEmpty(sorts)) {
             return sorts.stream().map(s -> s.toSort()).collect(Collectors.toList());
-        }else{
+        } else {
             return new ArrayList<>();
         }
     }
 
     /**
+     * @param clazz
+     * @return java.util.List<co.elastic.clients.elasticsearch._types.query_dsl.FieldAndFormat>
      * @author luyc
      * @Description 通过类查询有哪些字段需要查询
      * @Date 2022/12/30 16:12
-     * @param clazz
-     * @return java.util.List<co.elastic.clients.elasticsearch._types.query_dsl.FieldAndFormat>
      **/
-    private List<String> getFields(Class clazz){
+    private List<String> getFields(Class clazz) {
         List<String> list = new ArrayList<>();
         List<java.lang.reflect.Field> fieldList = new ArrayList<>();
         /**
          * 将父类的属性加入
          */
-        Collections.addAll(fieldList,clazz.getDeclaredFields());
+        Collections.addAll(fieldList, clazz.getDeclaredFields());
         Class superClass = clazz.getSuperclass();
-        while(superClass != null){
-            java.lang.reflect.Field[] superFields =  superClass.getDeclaredFields();
-            Collections.addAll(fieldList,superFields);
+        while (superClass != null) {
+            java.lang.reflect.Field[] superFields = superClass.getDeclaredFields();
+            Collections.addAll(fieldList, superFields);
             superClass = superClass.getSuperclass();
         }
 
-        for(java.lang.reflect.Field field:fieldList){
+        for (java.lang.reflect.Field field : fieldList) {
             JsonProperty jsonProperty = field.getAnnotation(JsonProperty.class);
-            if(jsonProperty != null){
+            if (jsonProperty != null) {
                 list.add(jsonProperty.value());
             }
         }
         return list;
     }
 
+
     /**
+     * @return co.elastic.clients.elasticsearch.core.SearchRequest
      * @Author luyc
      * @Description 创建文档查询请求
      * @Date 2022/10/14 10:18
      * @Param [index, query, sorts, size, queryAll]
-     * @return co.elastic.clients.elasticsearch.core.SearchRequest
      **/
-    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, Integer size, boolean queryAll,Class clazz){
+    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, Integer size, boolean queryAll, Class clazz) {
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
-            if(clazz != null && !clazz.equals(Void.class)){
-                builder.source(SourceConfig.of(s->s.filter(source->source.includes(getFields(clazz)))));
+            if (clazz != null && !clazz.equals(Void.class)) {
+                builder.source(SourceConfig.of(s -> s.filter(source -> source.includes(getFields(clazz)))));
             }
             builder.query(query);
-            if(queryAll) {
+            if (queryAll) {
                 //track_total_hits": true
                 builder.trackTotalHits(t -> t.enabled(true));
             }
-            if(!CollectionUtils.isEmpty(sorts)) {
+            if (!CollectionUtils.isEmpty(sorts)) {
                 builder.sort(sort(sorts));
             }
-            if(size != null && size.intValue() >= 0){
+            if (size != null && size.intValue() >= 0) {
                 builder.size(size);
             }
             return builder;
@@ -145,26 +146,26 @@ public class DbKit {
     }
 
     /**
+     * @return co.elastic.clients.elasticsearch.core.SearchRequest
      * @Author luyc
      * @Description 创建文档查询请求
      * @Date 2022/10/14 10:18
      * @Param [index, query, sorts, size, queryAll]
-     * @return co.elastic.clients.elasticsearch.core.SearchRequest
      **/
-    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, List<AggQuery> aggregations){
+    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, List<AggQuery> aggregations) {
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
             builder.query(query);
 
 
-            if(!CollectionUtils.isEmpty(sorts)) {
+            if (!CollectionUtils.isEmpty(sorts)) {
                 builder.sort(sort(sorts));
             }
 
-            if(!CollectionUtils.isEmpty(aggregations)) {
-                Map<String,Aggregation> aggregationMap = new HashMap<>();
-                for(AggQuery aggregation:aggregations){
-                    aggregationMap.put(aggregation.getAggName(),aggregation.getAggregation());
+            if (!CollectionUtils.isEmpty(aggregations)) {
+                Map<String, Aggregation> aggregationMap = new HashMap<>();
+                for (AggQuery aggregation : aggregations) {
+                    aggregationMap.put(aggregation.getAggName(), aggregation.getAggregation());
                 }
                 builder.aggregations(aggregationMap);
             }
@@ -174,22 +175,22 @@ public class DbKit {
     }
 
     /**
+     * @return co.elastic.clients.elasticsearch.core.SearchRequest
      * @Author luyc
      * @Description 创建文档查询请求
      * @Date 2022/10/14 10:18
      * @Param [index, query, sorts, size, queryAll]
-     * @return co.elastic.clients.elasticsearch.core.SearchRequest
      **/
-    private SearchRequest search(String index, Query query,  AggQuery... aggregations){
+    private SearchRequest search(String index, Query query, AggQuery... aggregations) {
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
             builder.query(query);
             builder.trackTotalHits(t -> t.enabled(true));
             builder.size(0);
-            if(aggregations != null && aggregations.length >0) {
-                Map<String,Aggregation> aggregationMap = new HashMap<>();
-                for(AggQuery aggregation:aggregations){
-                    aggregationMap.put(aggregation.getAggName(),aggregation.getAggregation());
+            if (aggregations != null && aggregations.length > 0) {
+                Map<String, Aggregation> aggregationMap = new HashMap<>();
+                for (AggQuery aggregation : aggregations) {
+                    aggregationMap.put(aggregation.getAggName(), aggregation.getAggregation());
                 }
                 builder.aggregations(aggregationMap);
             }
@@ -199,20 +200,20 @@ public class DbKit {
     }
 
     /**
+     * @return co.elastic.clients.elasticsearch.core.SearchRequest
      * @Author luyc
      * @Description 创建文档查询请求
      * @Date 2022/10/14 10:18
      * @Param [index, query, sorts, size, queryAll]
-     * @return co.elastic.clients.elasticsearch.core.SearchRequest
      **/
-    private SearchRequest search(String index, Query query, List<OrderQuery> sorts,  AggQuery aggregation){
+    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, AggQuery aggregation) {
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
             builder.query(query);
             builder.trackTotalHits(t -> t.enabled(true));
             builder.size(0);
-            if(aggregation != null){
-                builder.aggregations(aggregation.getAggName(),aggregation.getAggregation());
+            if (aggregation != null) {
+                builder.aggregations(aggregation.getAggName(), aggregation.getAggregation());
             }
             return builder;
         });
@@ -228,7 +229,7 @@ public class DbKit {
      **/
     public List<IndicesRecord> indices(String index) throws IOException {
         IndicesRequest request = IndicesRequest.of(builder -> {
-            if(StringUtils.hasLength(index)) {
+            if (StringUtils.hasLength(index)) {
                 builder.index(index);
             }
             return builder;
@@ -238,25 +239,25 @@ public class DbKit {
     }
 
     /**
+     * @return co.elastic.clients.elasticsearch._types.mapping.TypeMapping
      * @Author luyc
      * @Description 查询索引的字段结构
      * @Date 2022/10/13 15:33
      * @Param [index]
-     * @return co.elastic.clients.elasticsearch._types.mapping.TypeMapping
      **/
     public List<Field> selFields(String index) throws IOException {
-        GetIndexResponse response =client.indices().get(GetIndexRequest.of(builder -> {
-            List<String>  list = new ArrayList<>();
+        GetIndexResponse response = client.indices().get(GetIndexRequest.of(builder -> {
+            List<String> list = new ArrayList<>();
             builder.index(index);
             return builder;
         }));
         IndexState result = response.get(index);
         TypeMapping mapping = result.mappings();
-        Map<String, Property> fields =  mapping.properties();
-        Iterator<Map.Entry<String,Property>> iterator = fields.entrySet().iterator();
+        Map<String, Property> fields = mapping.properties();
+        Iterator<Map.Entry<String, Property>> iterator = fields.entrySet().iterator();
         List<Field> fieldList = new ArrayList<>();
-        while(iterator.hasNext()){
-            Map.Entry<String,Property> entry = iterator.next();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Property> entry = iterator.next();
             String fieldName = entry.getKey();
             Property property = entry.getValue();
             fieldList.add(new Field(fieldName, property));
@@ -265,46 +266,68 @@ public class DbKit {
     }
 
     /**
+     * @author luyc
+     * @Description 根据id查询文档
+     * @Date 2023/1/3 15:33
+     * @param index
+     * @param id
+     * @param documentType
+     * @return T
+     **/
+    public <T> T selById(String index,String id,Class<T> documentType) throws IOException {
+        GetResponse<T> response = client.get(g -> g
+                        .index(index)
+                        .id(id),
+                documentType
+        );
+        if(response.found()){
+            return response.source();
+        }else{
+            return null;
+        }
+    }
+
+    /**
+     * @return T
      * @Author luyc
      * @Description 查询单个文档
      * @Date 2022/10/13 16:10
      * @Param [index, query, documentType]
-     * @return T
      **/
-    public <T> T selSingleDocument(String index,Query query,Class<T> documentType) throws IOException {
-        SearchRequest searchRequest = search(index,query,null,1,false,documentType);
-        SearchResponse<T> response =  client.search(searchRequest,documentType);
+    public <T> T selSingleDocument(String index, Query query, Class<T> documentType) throws IOException {
+        SearchRequest searchRequest = search(index, query, null, 1, false, documentType);
+        SearchResponse<T> response = client.search(searchRequest, documentType);
         List<Hit<T>> list = response.hits().hits();
-        if(CollectionUtils.isEmpty(list)){
+        if (CollectionUtils.isEmpty(list)) {
             return null;
         }
         T result = list.get(0).source();
-        if(BaseEntity.class.isAssignableFrom(documentType)){
-            BaseEntity baseEntity = (BaseEntity)result;
+        if (BaseEntity.class.isAssignableFrom(documentType)) {
+            BaseEntity baseEntity = (BaseEntity) result;
             baseEntity.setId(list.get(0).id());
         }
         return result;
     }
 
-    
+
     /**
+     * @return java.util.List<T>
      * @Author luyc
      * @Description 查询列表
      * @Date 2022/10/14 10:21
      * @Param [index, query, sorts, documentType]
-     * @return java.util.List<T>
      **/
-    public <T> List<T> selList(String index, Query query, List<OrderQuery> sorts,Class<T> documentType) throws IOException {
-        SearchRequest searchRequest = search(index,query,sorts,null,true,documentType);
-        SearchResponse<T> response =  client.search(searchRequest,documentType);
+    public <T> List<T> selList(String index, Query query, List<OrderQuery> sorts, Class<T> documentType) throws IOException {
+        SearchRequest searchRequest = search(index, query, sorts, null, true, documentType);
+        SearchResponse<T> response = client.search(searchRequest, documentType);
         List<Hit<T>> hits = response.hits().hits();
         List<T> list = new ArrayList<>(hits.size());
         Iterator<Hit<T>> iterator = hits.iterator();
-        while(iterator.hasNext()){
+        while (iterator.hasNext()) {
             Hit<T> hit = iterator.next();
             T t = hit.source();
-            if(BaseEntity.class.isAssignableFrom(documentType)){
-                BaseEntity baseEntity = (BaseEntity)t;
+            if (BaseEntity.class.isAssignableFrom(documentType)) {
+                BaseEntity baseEntity = (BaseEntity) t;
                 baseEntity.setId(hit.id());
             }
             list.add(t);
@@ -312,121 +335,237 @@ public class DbKit {
         return list;
     }
 
+
+    /**
+     * @param index
+     * @param document
+     * @return boolean
+     * @author luyc
+     * @Description 插入一个文档
+     * @Date 2023/1/3 14:51
+     **/
+    public <T> boolean save(String index, T document) throws IOException {
+        if(BaseEntity.class.isAssignableFrom(document.getClass())){
+            ((BaseEntity) document).setCreateTime(LocalDateTime.now());
+            ((BaseEntity) document).setUpdateTime(LocalDateTime.now());
+        }
+        IndexRequest<T> indexRequest = IndexRequest.of(s -> s.index(index).document(document).refresh(Refresh.True));
+        IndexResponse response = client.index(indexRequest);
+        return Result.Created.equals(response.result());
+    }
+
+    /**
+     * @param index
+     * @param document
+     * @return com.luyc.esclient.common.OperateResult
+     * @author luyc
+     * @Description 插入一个文档
+     * @Date 2023/1/3 14:52
+     **/
+    public <T extends BaseEntity> OperateResult saveDocument(String index, T document) throws IOException {
+        document.setCreateTime(LocalDateTime.now());
+        document.setUpdateTime(LocalDateTime.now());
+        IndexRequest<T> indexRequest = IndexRequest.of(s -> s.index(index).document(document).refresh(Refresh.True));
+        IndexResponse response = client.index(indexRequest);
+        return new OperateResult(response.id(), Result.Created.equals(response.result()));
+    }
+
+    /**
+     * @param index
+     * @param document
+     * @return boolean
+     * @author luyc
+     * @Description 插入一个文档
+     * @Date 2023/1/3 14:51
+     **/
+    public <T> boolean save(String index, String id, T document) throws IOException {
+        if(BaseEntity.class.isAssignableFrom(document.getClass())){
+            ((BaseEntity) document).setCreateTime(LocalDateTime.now());
+            ((BaseEntity) document).setUpdateTime(LocalDateTime.now());
+        }
+        IndexRequest<T> indexRequest = IndexRequest.of(s -> s.index(index).id(id).document(document).refresh(Refresh.True));
+        IndexResponse response = client.index(indexRequest);
+        return Result.Created.equals(response.result());
+    }
+
+    /**
+     * @param index
+     * @param document
+     * @return com.luyc.esclient.common.OperateResult
+     * @author luyc
+     * @Description 插入一个文档
+     * @Date 2023/1/3 14:52
+     **/
+    public <T extends BaseEntity> OperateResult saveDocument(String index, String id, T document) throws IOException {
+        document.setCreateTime(LocalDateTime.now());
+        document.setUpdateTime(LocalDateTime.now());
+        IndexRequest<T> indexRequest = IndexRequest.of(s -> s.index(index).id(id).document(document).refresh(Refresh.True));
+        IndexResponse response = client.index(indexRequest);
+        return new OperateResult(response.id(), Result.Created.equals(response.result()));
+    }
+
+
     /**
      * @author luyc
-     * @Description 聚合查询
-     * @Date 2022/12/7 12:18
+     * @Description 批量插入
+     * @Date 2023/1/3 15:29
+     * @param index
+     * @param list
+     * @return com.luyc.esclient.common.Operate
+     **/
+    public <T extends BaseEntity> Operate saveByBulk(String index, List<T> list) throws IOException {
+        List<BulkOperation> operations = new ArrayList<>();
+        for (T document : list) {
+            document.setCreateTime(LocalDateTime.now());
+            document.setUpdateTime(LocalDateTime.now());
+            operations.add(
+                    BulkOperation.of(b -> b.index(
+                                    s -> {
+                                        s.index(index)
+                                                .document(document);
+                                        if (document.getId() != null) {
+                                            s.id(document.getId());
+                                        }
+                                        return s;
+                                    }
+                            )
+                    )
+
+            );
+        }
+        BulkRequest bulkRequest = BulkRequest.of(b -> b.refresh(Refresh.True).operations(operations));
+        BulkResponse response = client.bulk(bulkRequest);
+        if(response.errors()) {
+            List<OperateResult> l = new ArrayList<>();
+            int i = 1;
+            for (BulkResponseItem r : response.items()) {
+                if (r.error() != null){
+                    l.add(new OperateResult(false,Integer.valueOf(i),r.error().reason()));
+                }
+                i++;
+            }
+            return Operate.failed(l);
+        }else{
+            return Operate.success();
+        }
+    }
+
+
+    /**
      * @param index
      * @param query
      * @param aggQuery
      * @return physical.common.pojo.AggResult
+     * @author luyc
+     * @Description 聚合查询
+     * @Date 2022/12/7 12:18
      **/
-    public AggResult selByAgg(String index,  Query query, AggQuery aggQuery) throws IOException {
-        SearchRequest searchRequest = search(index,query,aggQuery);
+    public AggResult selByAgg(String index, Query query, AggQuery aggQuery) throws IOException {
+        SearchRequest searchRequest = search(index, query, aggQuery);
 
-        SearchResponse searchResponse =  client.search(searchRequest,Void.class);
+        SearchResponse searchResponse = client.search(searchRequest, Void.class);
         Map<String, Aggregate> agg = searchResponse.aggregations();
         AggResult aggResult = new AggResult(aggQuery.getAggName());
-        agg(agg.get(aggQuery.getAggName()),aggResult);
+        agg(agg.get(aggQuery.getAggName()), aggResult);
         return aggResult;
     }
 
     /**
-     * @author luyc
-     * @Description 多聚合查询
-     * @Date 2022/12/22 10:45
      * @param index
      * @param query
      * @param aggs
      * @return java.util.List<physical.common.pojo.AggResult>
+     * @author luyc
+     * @Description 多聚合查询
+     * @Date 2022/12/22 10:45
      **/
-    public List<AggResult> selByAggs(String index,Query query, AggQuery... aggs) throws IOException {
-        SearchRequest searchRequest = search(index,query,aggs);
-        SearchResponse searchResponse =  client.search(searchRequest, Void.class);
+    public List<AggResult> selByAggs(String index, Query query, AggQuery... aggs) throws IOException {
+        SearchRequest searchRequest = search(index, query, aggs);
+        SearchResponse searchResponse = client.search(searchRequest, Void.class);
         Map<String, Aggregate> aggsMap = searchResponse.aggregations();
         List<AggResult> list = new ArrayList<>();
-        for(AggQuery tempAgg:aggs) {
+        for (AggQuery tempAgg : aggs) {
             Aggregate agg = aggsMap.get(tempAgg.getAggName());
             AggResult aggResult = new AggResult(tempAgg.getAggName());
-            agg(agg,aggResult);
+            agg(agg, aggResult);
             list.add(aggResult);
         }
         return list;
     }
 
     /**
+     * @param agg    聚合
+     * @param result agg这层聚合的值
+     * @return physical.common.Record
      * @author luyc
      * @Description 使用递归的方式处理多层聚合
      * @Date 2022/12/1 11:34
-     * @param agg 聚合
-     * @param result agg这层聚合的值
-     * @return physical.common.Record
      **/
-    private AggResult agg(Aggregate agg,AggResult result){
-        if(agg.isSterms() ){
+    private AggResult agg(Aggregate agg, AggResult result) {
+        if (agg.isSterms()) {
             result.initBucket();
-            for(StringTermsBucket bucket:agg.sterms().buckets().array()){
-                Bucket b = new Bucket(bucket.key(),bucket.docCount());
+            for (StringTermsBucket bucket : agg.sterms().buckets().array()) {
+                Bucket b = new Bucket(bucket.key(), bucket.docCount());
                 result.addBucket(b);
                 b.initSubAggs();
                 Map<String, Aggregate> aggregations = bucket.aggregations();
-                for(Map.Entry<String, Aggregate> tmp:aggregations.entrySet()){
+                for (Map.Entry<String, Aggregate> tmp : aggregations.entrySet()) {
                     AggResult r = new AggResult(tmp.getKey());
-                    agg(tmp.getValue(),r);
+                    agg(tmp.getValue(), r);
                     b.addSubAgg(r);
                 }
             }
         } else if (agg.isLterms()) {
             result.initBucket();
-            for(LongTermsBucket bucket:agg.lterms().buckets().array()){
-                Bucket b = new Bucket(bucket.key(),bucket.docCount());
+            for (LongTermsBucket bucket : agg.lterms().buckets().array()) {
+                Bucket b = new Bucket(bucket.key(), bucket.docCount());
                 result.addBucket(b);
                 b.initSubAggs();
                 Map<String, Aggregate> aggregations = bucket.aggregations();
-                for(Map.Entry<String, Aggregate> tmp:aggregations.entrySet()){
+                for (Map.Entry<String, Aggregate> tmp : aggregations.entrySet()) {
                     AggResult r = new AggResult(tmp.getKey());
-                    agg(tmp.getValue(),r);
+                    agg(tmp.getValue(), r);
                     b.addSubAgg(r);
                 }
             }
         } else if (agg.isDterms()) {
             result.initBucket();
-            for(DoubleTermsBucket bucket:agg.dterms().buckets().array()){
-                Bucket b = new Bucket(bucket.keyAsString(),bucket.docCount());
+            for (DoubleTermsBucket bucket : agg.dterms().buckets().array()) {
+                Bucket b = new Bucket(bucket.keyAsString(), bucket.docCount());
                 result.addBucket(b);
                 b.initSubAggs();
                 Map<String, Aggregate> aggregations = bucket.aggregations();
-                for(Map.Entry<String, Aggregate> tmp:aggregations.entrySet()){
+                for (Map.Entry<String, Aggregate> tmp : aggregations.entrySet()) {
                     AggResult r = new AggResult(tmp.getKey());
-                    agg(tmp.getValue(),r);
+                    agg(tmp.getValue(), r);
                     b.addSubAgg(r);
                 }
             }
         } else if (agg.isDateHistogram()) {
             DateHistogramAggregate dateHistogramAggregate = agg.dateHistogram();
             result.initBucket();
-            for(DateHistogramBucket dateBucket:dateHistogramAggregate.buckets().array()){
+            for (DateHistogramBucket dateBucket : dateHistogramAggregate.buckets().array()) {
                 Bucket b = new Bucket(dateBucket.keyAsString(), dateBucket.docCount());
                 result.addBucket(b);
                 b.initSubAggs();
                 Map<String, Aggregate> aggregations = dateBucket.aggregations();
-                for(Map.Entry<String, Aggregate> tmp:aggregations.entrySet()){
+                for (Map.Entry<String, Aggregate> tmp : aggregations.entrySet()) {
                     AggResult r = new AggResult(tmp.getKey());
-                    agg(tmp.getValue(),r);
+                    agg(tmp.getValue(), r);
                     b.addSubAgg(r);
                 }
             }
-        } else{
-            if(agg.isSum()) {
+        } else {
+            if (agg.isSum()) {
                 result.setValue(String.valueOf(agg.sum().value()));
                 result.setDoubleValue(agg.sum().value());
-            }else if(agg.isValueCount()) {
+            } else if (agg.isValueCount()) {
                 result.setValue(agg.valueCount().valueAsString());
                 result.setDoubleValue(agg.valueCount().value());
-            } else if(agg.isCardinality()){
+            } else if (agg.isCardinality()) {
                 result.setValue(String.valueOf(agg.cardinality().value()));
                 result.setLongValue(agg.cardinality().value());
-            } else if(agg.isAvg()){
+            } else if (agg.isAvg()) {
                 result.setValue(agg.avg().valueAsString());
                 result.setDoubleValue(agg.avg().value());
             }

@@ -2,6 +2,8 @@ package com.luyc.esclient.common;
 
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
@@ -12,6 +14,8 @@ import java.time.LocalDateTime;
  */
 public class BaseEntity {
 
+    @JsonIgnoreProperties
+    @JsonIgnore
     private String id;
 
     @JsonProperty(namespace = "create_time",value = "create_time")
