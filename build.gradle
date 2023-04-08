@@ -37,6 +37,8 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 //    elastic
     implementation 'co.elastic.clients:elasticsearch-java:7.17.6'
+    // https://mvnrepository.com/artifact/org.elasticsearch.client/elasticsearch-rest-client
+    implementation group: 'org.elasticsearch.client', name: 'elasticsearch-rest-client', version: '7.17.2'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.3'
     implementation 'jakarta.json:jakarta.json-api:2.0.1'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: '2.13.3'
