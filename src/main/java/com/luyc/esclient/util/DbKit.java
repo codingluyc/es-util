@@ -22,6 +22,8 @@ import co.elastic.clients.elasticsearch.indices.IndexState;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.luyc.esclient.common.*;
 import com.luyc.esclient.vo.Field;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -40,31 +42,14 @@ import java.util.stream.Collectors;
  */
 @Component
 public class DbKit {
+    private static final Logger log = LoggerFactory.getLogger(DbKit.class);
+
     private ElasticsearchClient client;
 
     @Autowired
     public void setClient(ElasticsearchClient client) {
         this.client = client;
     }
-
-
-//    public static final int MATCH = 1;//分词匹配
-//    public static final int MATCH_PHRASE = 2;//精确匹配
-//
-//    public static final int ISNUll = 3;//为空
-//    public static final int ISNotNUll = 4;//不为空
-//
-//    public static final int TERM = 5;//精确匹配
-//    public static final int NOTTERM = 6;//不相等
-//    public static final int TERMIN = 7;//在....之内
-//
-//    public static final int RANGEGT = 8;//大于
-//    public static final int RANGELT = 9;//小于
-//    public static final int RANGEGTE = 10;//大于等于
-//    public static final int RANGELTE = 11;//小于等于
-//
-//
-//    public static final int WILDCARD = 12;//模糊匹配
 
 
     //默认最大数据量
@@ -355,6 +340,22 @@ public class DbKit {
     }
 
     /**
+     * @author luyc
+     * @Description 分根据查询删除
+     * @Date 2023/4/11 14:37
+     * @param index
+     * @param query
+     * @return boolean
+     **/
+    public boolean deleteByQuery(String index,Query query) throws IOException {
+        DeleteByQueryRequest queryRequest = DeleteByQueryRequest.of(d->d.index(index).query(query));
+        DeleteByQueryResponse response = client.deleteByQuery(queryRequest);
+        log.info("delete {} rows from index {}",response.deleted(),index);
+        return response.failures().size() == 0;
+    }
+
+
+    /**
      * @param index
      * @param document
      * @return com.luyc.esclient.common.OperateResult
@@ -444,8 +445,10 @@ public class DbKit {
                 }
                 i++;
             }
+            log.warn("saving data into index {} has failed number for {},total:{}",index,l.size(),list.size());
             return Operate.failed(l);
         }else{
+            log.info("saving data into index {},total:{}",index,list.size());
             return Operate.success();
         }
     }
