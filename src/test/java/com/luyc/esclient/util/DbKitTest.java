@@ -36,7 +36,7 @@ public class DbKitTest extends EsClientApplicationTests {
 
     @Test
     void selSingleDocument() throws IOException {
-        List<UIMRScanRecord> person = dbKit.selList("xczk_ui_mr_scan_record_collector",null ,null, UIMRScanRecord.class);
+        List<UIMRScanRecord> person = dbKit.selList10000("xczk_ui_mr_scan_record_collector",null ,null, UIMRScanRecord.class);
     }
 
 

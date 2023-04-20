@@ -7,7 +7,6 @@ import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.aggregations.*;
 import co.elastic.clients.elasticsearch._types.mapping.Property;
 import co.elastic.clients.elasticsearch._types.mapping.TypeMapping;
-import co.elastic.clients.elasticsearch._types.query_dsl.FieldAndFormat;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch.cat.IndicesRequest;
 import co.elastic.clients.elasticsearch.cat.indices.IndicesRecord;
@@ -117,7 +116,7 @@ public class DbKit {
             builder.query(query);
             if (queryAll) {
                 //track_total_hits": true
-                builder.trackTotalHits(t -> t.enabled(true));
+                builder.size(MAX_SIZE);
             }
             if (!CollectionUtils.isEmpty(sorts)) {
                 builder.sort(sort(sorts));
@@ -330,7 +329,7 @@ public class DbKit {
      * @Date 2022/10/14 10:21
      * @Param [index, query, sorts, documentType]
      **/
-    public <T> List<T> selList(String index, Query query, List<OrderQuery> sorts, Class<T> documentType) throws IOException {
+    public <T> List<T> selList10000(String index, Query query, List<OrderQuery> sorts, Class<T> documentType) throws IOException {
         SearchRequest searchRequest = search(index, query, sorts, null, true, documentType);
         SearchResponse<T> response = client.search(searchRequest, documentType);
         List<Hit<T>> hits = response.hits().hits();
