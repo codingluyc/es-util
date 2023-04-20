@@ -48,4 +48,14 @@ public class PageQuery {
     public void setPageSize(Integer pageSize) {
         this.pageSize = pageSize;
     }
+
+    public Integer getFrom(){
+        if(pageNumber == null){
+            return 0;
+        }
+        if(pageSize == null){
+            return 0;
+        }
+        return (pageNumber-1)*pageSize;
+    }
 }

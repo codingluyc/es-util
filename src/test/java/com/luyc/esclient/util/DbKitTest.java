@@ -9,14 +9,12 @@ import co.elastic.clients.elasticsearch._types.query_dsl.TermsQueryField;
 import co.elastic.clients.elasticsearch.cat.indices.IndicesRecord;
 import co.elastic.clients.json.JsonData;
 import com.luyc.esclient.EsClientApplicationTests;
+import com.luyc.esclient.UIMRScanRecord;
 import com.luyc.esclient.common.AggQuery;
 import com.luyc.esclient.common.AggResult;
-import com.luyc.esclient.UIMRScanRecord;
-import com.luyc.esclient.po.Person;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,14 +42,14 @@ public class DbKitTest extends EsClientApplicationTests {
 
     @Test
     void insert() throws IOException {
-        Person person = new Person();
-        person.setName("sadwd");
-        person.setName("has id");
-        person.setBirthday(LocalDate.now());
-        person.setHeight(185);
-        person.setMoto("hahahaha");
-        person.setNum("148468");
-        dbKit.save("person_t",person);
+//        Person person = new Person();
+//        person.setName("sadwd");
+//        person.setName("has id");
+//        person.setBirthday(LocalDate.now());
+//        person.setHeight(185);
+//        person.setMoto("hahahaha");
+//        person.setNum("148468");
+//        dbKit.save("person_t",person);
     }
 
     @Test
@@ -77,6 +75,5 @@ public class DbKitTest extends EsClientApplicationTests {
         Aggregation.Builder aggBuilder = new Aggregation.Builder();
         Aggregation agg = aggBuilder.terms(t->t.field("type")).aggregations("sum",sum).aggregations("hosp",AggregationBuilders.terms(s->s.field("hosp_id"))).build();
         AggResult result =  dbKit.selByAgg("xczk_usetime_pacs",query,new AggQuery("type",agg));
-
     }
 }

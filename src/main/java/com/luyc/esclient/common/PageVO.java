@@ -56,4 +56,16 @@ public class PageVO<T> {
     public void setTotalNumber(int totalNumber) {
         this.totalNumber = totalNumber;
     }
+
+    /**
+     * @author luyc
+     * @Description 计算页码数量
+     * @Date 2023/4/20 14:58
+     * @param count
+     * @param pageSize
+     * @return java.lang.Integer
+     **/
+    public static Integer calculateTotalNumber(Long count,Integer pageSize){
+        return count.intValue()%pageSize.intValue() == 0?  count.intValue()/pageSize.intValue() : count.intValue()/pageSize.intValue() +1 ;
+    }
 }

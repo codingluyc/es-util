@@ -191,6 +191,34 @@ public class DbKit {
      * @Date 2022/10/14 10:18
      * @Param [index, query, sorts, size, queryAll]
      **/
+    private SearchRequest search(String index, Query query, List<OrderQuery> sorts, Class clazz,PageQuery pageQuery) {
+        SearchRequest searchRequest = SearchRequest.of(builder -> {
+            builder.index(index);
+            if (clazz != null && !clazz.equals(Void.class)) {
+                builder.source(SourceConfig.of(s -> s.filter(source -> source.includes(getFields(clazz)))));
+            }
+            builder.query(query);
+            if (!CollectionUtils.isEmpty(sorts)) {
+                builder.sort(sort(sorts));
+            }
+
+
+            if(pageQuery != null){
+                builder.from(pageQuery.getFrom());
+                builder.size(pageQuery.getPageSize());
+            }
+            return builder;
+        });
+        return searchRequest;
+    }
+
+    /**
+     * @return co.elastic.clients.elasticsearch.core.SearchRequest
+     * @Author luyc
+     * @Description 创建文档查询请求
+     * @Date 2022/10/14 10:18
+     * @Param [index, query, sorts, size, queryAll]
+     **/
     private SearchRequest search(String index, Query query, List<OrderQuery> sorts, AggQuery aggregation) {
         SearchRequest searchRequest = SearchRequest.of(builder -> {
             builder.index(index);
@@ -320,6 +348,61 @@ public class DbKit {
         return list;
     }
 
+    /**
+     * @author luyc
+     * @Description 查询数量
+     * @Date 2023/4/20 14:20
+     * @param index
+     * @param query
+     * @return java.lang.Long
+     **/
+    public Long count(String index,Query query) throws IOException {
+        CountRequest request = CountRequest.of(b->{
+            b.index(index)
+                    .query(query);
+            return b;
+        });
+        CountResponse response = client.count(request);
+        return Long.valueOf(response.count());
+    }
+
+
+    /**
+     * @author luyc
+     * @Description 10000条数据以内分页查询
+     * @Date 2023/4/20 14:36
+     * @param index
+     * @param query
+     * @param sorts
+     * @param documentType
+     * @param pageQuery
+     * @return com.xczk.pacs_pool.esclient.common.PageVO<T>
+     **/
+    public <T> PageVO<T> selPageIn10000(String index, Query query, List<OrderQuery> sorts, Class<T> documentType,PageQuery pageQuery) throws IOException {
+
+        Long count = count(index,query);
+
+        SearchRequest searchRequest = search(index, query, sorts, documentType,pageQuery);
+        SearchResponse<T> response = client.search(searchRequest, documentType);
+        List<Hit<T>> hits = response.hits().hits();
+        List<T> list = new ArrayList<>(hits.size());
+        Iterator<Hit<T>> iterator = hits.iterator();
+        while (iterator.hasNext()) {
+            Hit<T> hit = iterator.next();
+            T t = hit.source();
+            if (BaseEntity.class.isAssignableFrom(documentType)) {
+                BaseEntity baseEntity = (BaseEntity) t;
+                baseEntity.setId(hit.id());
+            }
+            list.add(t);
+        }
+        PageVO<T> pageVO = new PageVO<>();
+        pageVO.setRecordList(list);
+        pageVO.setTotal(count.longValue());
+        pageVO.setPageNumber(pageQuery.getPageNumber());
+        pageVO.setTotalNumber(PageVO.calculateTotalNumber(count,pageQuery.getPageSize()));
+        return pageVO;
+    }
 
     /**
      * @param index
