@@ -15,9 +15,8 @@ import co.elastic.clients.elasticsearch.core.bulk.BulkOperation;
 import co.elastic.clients.elasticsearch.core.bulk.BulkResponseItem;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.SourceConfig;
-import co.elastic.clients.elasticsearch.indices.GetIndexRequest;
-import co.elastic.clients.elasticsearch.indices.GetIndexResponse;
-import co.elastic.clients.elasticsearch.indices.IndexState;
+import co.elastic.clients.elasticsearch.indices.ExistsRequest;
+import co.elastic.clients.elasticsearch.indices.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.luyc.esclient.common.*;
 import com.luyc.esclient.vo.Field;
@@ -275,6 +274,38 @@ public class DbKit {
             fieldList.add(new Field(fieldName, property));
         }
         return fieldList;
+    }
+
+    /**
+     * 创建索引，如果索引不存在
+     * 2023/6/2
+     */
+    public void createIndexIfNotExists(String index, List<IndexField> fields) throws IOException {
+        co.elastic.clients.elasticsearch.indices.ExistsRequest existsRequest = ExistsRequest.of(builder -> builder.index(index));
+        boolean exists = client.indices().exists(existsRequest).value();
+        if (exists) {
+            log.info("index{} is already exists", index);
+            return;
+        }
+
+        CreateIndexRequest createIndexRequest = CreateIndexRequest.of(builder -> {
+            builder.index(index);
+            if (!CollectionUtils.isEmpty(fields)) {
+                builder.mappings(
+                        TypeMapping.of(
+                                tb -> {
+                                    for (IndexField f : fields) {
+                                        tb.properties(f.getName(), new Property(f.getType(), f.toJsonData()));
+                                    }
+                                    return tb;
+                                }
+                        )
+                );
+            }
+            return builder;
+        });
+        CreateIndexResponse response = client.indices().create(createIndexRequest);
+        log.info("create index:{},success:{}",index,response.acknowledged());
     }
 
     /**
