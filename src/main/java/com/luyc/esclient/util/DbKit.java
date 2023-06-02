@@ -521,17 +521,20 @@ public class DbKit {
         if(response.errors()) {
             List<OperateResult> l = new ArrayList<>();
             int i = 1;
+            int s = 0;
             for (BulkResponseItem r : response.items()) {
                 if (r.error() != null){
                     l.add(new OperateResult(false,Integer.valueOf(i),r.error().reason()));
+                }else{
+                    s++;
                 }
                 i++;
             }
             log.warn("saving data into index {} has failed number for {},total:{}",index,l.size(),list.size());
-            return Operate.failed(l);
+            return Operate.failed(s,l);
         }else{
             log.info("saving data into index {},total:{}",index,list.size());
-            return Operate.success();
+            return Operate.success(Integer.valueOf(list.size()));
         }
     }
 
